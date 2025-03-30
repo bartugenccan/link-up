@@ -8,20 +8,26 @@ const router = express.Router();
 
 // Register
 router.post("/register", async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, name } = req.body;
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("users")
-    .insert([{ email, password: hashedPassword }])
+    .insert([{ email, password: hashedPassword, name }])
     .select("*");
 
   if (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      status: false,
+      message: error.message,
+    });
   }
 
-  res.json({ message: "User registered successfully", user: data });
+  res.json({
+    status: true,
+    message: "User registered successfully",
+  });
 });
 
 // Login
@@ -35,14 +41,20 @@ router.post("/login", async (req, res) => {
     .limit(1);
 
   if (error) {
-    return res.status(400).json({ error: "Invalid credentials" });
+    return res.status(400).json({
+      status: false,
+      message: "Invalid credentials",
+    });
   }
 
   const user = users[0];
   const isPasswordValid = await bcrypt.compare(password, user.password);
 
   if (!isPasswordValid) {
-    return res.status(400).json({ error: "Invalid credentials" });
+    return res.status(400).json({
+      status: false,
+      message: "Invalid credentials",
+    });
   }
 
   // Create a JWT token
@@ -54,19 +66,38 @@ router.post("/login", async (req, res) => {
     }
   );
 
-  res.json({ message: "Logged in successfully", token });
+  res.json({
+    status: true,
+    message: "Logged in successfully",
+    data: {
+      token,
+      user,
+    },
+  });
 });
 
 // Validate Token
 const authenticateToken = (req, res, next) => {
   const authHeader = req.header("Authorization");
-  if (!authHeader) return res.status(401).json({ error: "Unauthorized" });
+  if (!authHeader)
+    return res.status(401).json({
+      status: false,
+      message: "Unauthorized",
+    });
 
   const token = authHeader.split(" ")[1];
-  if (!token) return res.status(401).json({ error: "Unauthorized" });
+  if (!token)
+    return res.status(401).json({
+      status: false,
+      message: "Unauthorized",
+    });
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ error: "Forbidden" });
+    if (err)
+      return res.status(403).json({
+        status: false,
+        message: "Forbidden",
+      });
     req.user = user;
     next();
   });
@@ -83,10 +114,17 @@ router.get("/profile", authenticateToken, async (req, res) => {
     .single();
 
   if (error) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({
+      status: false,
+      message: error.message,
+    });
   }
 
-  res.json(data);
+  res.json({
+    status: true,
+    message: "Profile retrieved successfully",
+    data,
+  });
 });
 
 module.exports = router;
