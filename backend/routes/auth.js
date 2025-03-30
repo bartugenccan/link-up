@@ -66,38 +66,52 @@ router.post("/login", async (req, res) => {
     }
   );
 
+  // Kullanıcı bilgilerinden şifreyi çıkar
+  const { password: _, ...userWithoutPassword } = user;
+
+  // Set HTTP-only cookie
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production", // HTTPS üzerinden çalışıyorsa true olmalı
+    sameSite: "strict",
+    maxAge: 3600000, // 1 saat
+  });
+
   res.json({
     status: true,
     message: "Logged in successfully",
     data: {
-      token,
-      user,
+      user: userWithoutPassword,
     },
   });
 });
 
 // Validate Token
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.header("Authorization");
-  if (!authHeader)
-    return res.status(401).json({
-      status: false,
-      message: "Unauthorized",
-    });
+  // İlk olarak cookie'den token'ı al
+  const tokenFromCookie = req.cookies.token;
 
-  const token = authHeader.split(" ")[1];
-  if (!token)
+  // Cookie yoksa header'dan almayı dene (eski sistemlerle uyumluluk için)
+  const authHeader = req.header("Authorization");
+  const tokenFromHeader = authHeader ? authHeader.split(" ")[1] : null;
+
+  // İki kaynaktan birinden token'ı al
+  const token = tokenFromCookie || tokenFromHeader;
+
+  if (!token) {
     return res.status(401).json({
       status: false,
       message: "Unauthorized",
     });
+  }
 
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err)
+    if (err) {
       return res.status(403).json({
         status: false,
         message: "Forbidden",
       });
+    }
     req.user = user;
     next();
   });
@@ -109,7 +123,7 @@ router.get("/profile", authenticateToken, async (req, res) => {
 
   const { data, error } = await supabase
     .from("users")
-    .select("id, email")
+    .select("id, email, name, created_at, updated_at")
     .eq("id", id)
     .single();
 
@@ -124,6 +138,31 @@ router.get("/profile", authenticateToken, async (req, res) => {
     status: true,
     message: "Profile retrieved successfully",
     data,
+  });
+});
+
+// Logout
+router.post("/logout", authenticateToken, async (req, res) => {
+  // Cookie'yi temizle
+  res.clearCookie("token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
+
+  res.json({
+    status: true,
+    message: "Logged out successfully",
+  });
+});
+
+// Verify Token
+router.get("/verify", authenticateToken, async (req, res) => {
+  // Token zaten authenticateToken middleware'i tarafından doğrulandı
+  // Sadece başarılı yanıt dönebiliriz
+  res.json({
+    status: true,
+    message: "Token is valid",
   });
 });
 

@@ -8,7 +8,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import linkUpAnimation from "../../../../public/animations/link-up-login.json";
 import { RegisterFormValues, registerSchema } from "@/lib/validations/auth";
-import { register } from "@/lib/api/auth";
+import { register as registerUser } from "@/lib/api/auth";
 import { toast } from "sonner";
 
 const Lottie = dynamic(() => import("lottie-react"), {
@@ -32,10 +32,17 @@ export default function RegisterPage() {
   async function onSubmit(data: RegisterFormValues) {
     setIsLoading(true);
     try {
-      const response = await register(data);
+      const response = await registerUser(data);
+
       if (response.status) {
-        toast.success("Account created successfully");
+        toast.success(
+          response.message || "Account created successfully! Please log in."
+        );
         router.push("/auth/login");
+      } else {
+        toast.error(
+          response.message || "Registration failed. Please try again."
+        );
       }
     } catch (error) {
       if (error instanceof Error) {

@@ -10,6 +10,7 @@ import linkUpAnimation from "../../../../public/animations/link-up-login.json";
 import { LoginFormValues, loginSchema } from "@/lib/validations/auth";
 import { login } from "@/lib/api/auth";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/hooks/useAuth";
 
 const Lottie = dynamic(() => import("lottie-react"), {
   ssr: false,
@@ -18,6 +19,7 @@ const Lottie = dynamic(() => import("lottie-react"), {
 export default function LoginPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const auth = useAuth();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -31,14 +33,33 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       const response = await login(data);
-      // Store token in localStorage or secure cookie
-      if (response.status && response.data?.token) {
-        localStorage.setItem("token", response.data?.token);
-        toast.success("Login successful!");
-        router.push("/");
+
+      if (response.status && response.data) {
+        // API yanıtı başarılı
+        const { user } = response.data;
+
+        // useAuth hook'una user bilgisini set et
+        auth.login(user);
+
+        toast.success(response.message || "Login successful!");
+
+        // callbackUrl varsa oraya, yoksa dashboard'a yönlendir
+        const callbackUrl = new URLSearchParams(window.location.search).get(
+          "callbackUrl"
+        );
+        router.push(callbackUrl || "/");
+      } else {
+        // API yanıtı başarısız
+        toast.error(
+          response.message || "Login failed. Please check your credentials."
+        );
       }
     } catch (error) {
-      toast.error("Login failed. Please check your credentials.");
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("An unexpected error occurred");
+      }
       console.error(error);
     } finally {
       setIsLoading(false);
@@ -77,10 +98,10 @@ export default function LoginPage() {
         <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[350px]">
           <div className="flex flex-col space-y-2 text-center">
             <h1 className="text-2xl font-semibold tracking-tight">
-              Welcome back
+              Sign in to your account
             </h1>
             <p className="text-sm text-muted-foreground">
-              Enter your email to sign in to your account
+              Enter your email below to sign in to your account
             </p>
           </div>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -133,7 +154,7 @@ export default function LoginPage() {
               {isLoading && (
                 <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" />
               )}
-              Sign In
+              Sign in
             </button>
           </form>
           <p className="px-8 text-center text-sm text-muted-foreground">
@@ -141,7 +162,7 @@ export default function LoginPage() {
               href="/auth/register"
               className="hover:text-brand underline underline-offset-4"
             >
-              Don&apos;t have an account? Sign Up
+              Don't have an account? Sign Up
             </Link>
           </p>
         </div>

@@ -1,12 +1,26 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const cookieParser = require("cookie-parser");
 const authRoutes = require("./routes/auth");
 
 const app = express();
 
+// Cookie parser middleware
+app.use(cookieParser());
+
+// Body parser middleware
 app.use(express.json());
-app.use(cors());
+
+// CORS configuration
+app.use(
+  cors({
+    origin: "http://localhost:3000", // Frontend URL
+    credentials: true, // Allow cookies to be sent with requests
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
 app.use("/auth", authRoutes);
 
